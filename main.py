@@ -3,7 +3,7 @@ import traceback
 from waitress import serve
 from flask import Flask, Response, request
 from supabase import create_client, Client
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import requests
 
@@ -17,6 +17,9 @@ supabase_url: str = os.environ.get("SUPABASE_URL")
 app = Flask(__name__)
 
 supabase_key: str = os.environ.get("SUPABASE_KEY")
+
+def _getNow():
+    return datetime.utcnow()
 
 def _getYoutubeVideoInfo(video_id: str, hl: str = "ja"):
     r = requests.post(
@@ -52,7 +55,8 @@ def _getStatusIfInLifetime(key: str):
     status: dict = supabase.table("status").select("value", "updated_at").eq("id", key).execute().data[0]
     updated_at = datetime.strptime(status["updated_at"], SUPABASE_TIME_FORMAT)
 
-    age = datetime.now() - updated_at
+    age = _getNow() - updated_at
+    print(age)
     if age.total_seconds() > STATUS_LIFETIMES_S[key]:
         return None
 
@@ -60,7 +64,7 @@ def _getStatusIfInLifetime(key: str):
 
 def _setStatus(key: str, value):
     supabase: Client = create_client(supabase_url, supabase_key)
-    supabase.table("status").update({"value": value, "updated_at": datetime.now().strftime(SUPABASE_TIME_FORMAT)}).eq("id", key).execute()
+    supabase.table("status").update({"value": value, "updated_at": _getNow().strftime(SUPABASE_TIME_FORMAT)}).eq("id", key).execute()
 
 @app.route("/")
 def status():
