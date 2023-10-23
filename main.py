@@ -44,8 +44,15 @@ def _getYoutubeVideoInfo(video_id: str, hl: str = "ja"):
     data = r.json()
     details = data["videoDetails"]
 
-    ret = {key: details[key] for key in ("videoId", "title", "lengthSeconds", "author", "channelId", "viewCount")}
-    ret["thumbnails"] = details["thumbnail"]["thumbnails"]
+    ret = {
+        "youtube_video_id": details["videoId"],
+        "title": details["title"],
+        "channel_name": details["author"],
+        "channel_id": details["channelId"],
+        "thumbnails": details["thumbnail"]["thumbnails"],
+        "duration_seconds": details["lengthSeconds"],
+        "view_count": details["viewCount"]
+    }
 
     return ret
 
@@ -55,12 +62,12 @@ def _getStatusIfInLifetime(key: str):
     status: dict = supabase.table("status").select("value", "updated_at").eq("id", key).execute().data[0]
     updated_at = datetime.strptime(status["updated_at"], SUPABASE_TIME_FORMAT)
 
-    age = _getNow() - updated_at
-    print(age)
-    if age.total_seconds() > STATUS_LIFETIMES_S[key]:
+    age = (_getNow() - updated_at).total_seconds()
+    if age > STATUS_LIFETIMES_S[key]:
         return None
 
-    return status["value"]
+    status["age"] = age
+    return status
 
 def _setStatus(key: str, value):
     supabase: Client = create_client(supabase_url, supabase_key)
@@ -70,19 +77,25 @@ def _setStatus(key: str, value):
 def status():
     return "Nothing here!"
 
+def _getListeningTo():
+    data = _getStatusIfInLifetime("listening_to")
+
+    if data is None:
+        return None
+
+    if "youtube_video_id" in data["value"]:
+        data["youtube_video_id"] = data["value"]["youtube_video_id"]
+    else:
+        return None
+
+    data.pop("value")
+    return data
+
 @app.route("/song", methods = ["GET", "POST", "DELETE"])
 def song():
     try:
         if request.method == "GET":
-            data = _getStatusIfInLifetime("listening_to")
-        
-            if data is None:
-                return json.dumps(None)
-        
-            if "youtube_video_id" in data:
-                return data["youtube_video_id"]
-
-            return json.dumps(None)
+            return Response(json.dumps(_getListeningTo()), mimetype = "application/json")
         
         elif request.method == "POST":
             data = request.json
@@ -111,7 +124,7 @@ def song():
 @app.route("/song/info")
 def songInfo():
     try:
-        data = _getStatusIfInLifetime("listening_to")
+        data = _getListeningTo()
         if data is None:
             return json.dumps(None)
         
@@ -120,7 +133,8 @@ def songInfo():
         else:
             return json.dumps(None)
 
-        return Response(json.dumps(video_info), mimetype = "application/json")
+        data.update(video_info)
+        return Response(json.dumps(data), mimetype = "application/json")
     
     except Exception:
         tb = traceback.format_exc()
