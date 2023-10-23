@@ -14,9 +14,10 @@ USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:105.0) Gecko/20100101 Firefox/1
 SUPABASE_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 supabase_url: str = os.environ.get("SUPABASE_URL")
-app = Flask(__name__)
-
 supabase_key: str = os.environ.get("SUPABASE_KEY")
+
+app = Flask(__name__)
+app.url_map.strict_slashes = False
 
 def _getNow():
     return datetime.utcnow()
