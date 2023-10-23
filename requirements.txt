@@ -3,3 +3,4 @@ gunicorn==20.1.0
 Werkzeug==2.3.7
 waitress==2.1.2
 supabase==1.2.0
+requests==2.7.0
