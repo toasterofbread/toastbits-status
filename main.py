@@ -13,8 +13,13 @@ STATUS_LIFETIMES_S: dict[str, int] = {
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:105.0) Gecko/20100101 Firefox/105.0"
 SUPABASE_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
-supabase_url: str = os.environ.get("SUPABASE_URL")
-supabase_key: str = os.environ.get("SUPABASE_KEY")
+TOASTBITS_AUTH_TOKEN: str = os.environ.get("TOASTBITS_AUTH_TOKEN")
+SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY")
+
+assert(TOASTBITS_AUTH_TOKEN is not None)
+assert(SUPABASE_URL is not None)
+assert(SUPABASE_KEY is not None)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
@@ -58,7 +63,7 @@ def _getYoutubeVideoInfo(video_id: str, hl: str = "ja"):
     return ret
 
 def _getStatusIfInLifetime(key: str):
-    supabase: Client = create_client(supabase_url, supabase_key)
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     
     status: dict = supabase.table("status").select("value", "updated_at").eq("id", key).execute().data[0]
     updated_at = datetime.strptime(status["updated_at"], SUPABASE_TIME_FORMAT)
@@ -71,12 +76,17 @@ def _getStatusIfInLifetime(key: str):
     return status
 
 def _setStatus(key: str, value):
-    supabase: Client = create_client(supabase_url, supabase_key)
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     supabase.table("status").update({"value": value, "updated_at": _getNow().strftime(SUPABASE_TIME_FORMAT)}).eq("id", key).execute()
 
-@app.route("/")
-def status():
-    return "Nothing here!"
+def _checkRequestAuth(request_data):
+    if not "token" in request_data:
+        return Response("Expected authorisation token in payload", 401)
+
+    if request_data["token"] != TOASTBITS_AUTH_TOKEN:
+        return Response("Invalid authorisation token in payload", 401)
+
+    return None
 
 def _getListeningTo():
     data = _getStatusIfInLifetime("listening_to")
@@ -92,6 +102,10 @@ def _getListeningTo():
     data.pop("value")
     return data
 
+@app.route("/")
+def status():
+    return "Nothing here!"
+
 @app.route("/song", methods = ["GET", "POST", "DELETE"])
 def song():
     try:
@@ -101,6 +115,10 @@ def song():
         elif request.method == "POST":
             data = request.json
 
+            auth_response = _checkRequestAuth(data)
+            if auth_response is not None:
+                return auth_response
+
             if len(data) == 0:
                 _setStatus("listening_to", {})
             elif "youtube_video_id" in data:
@@ -109,6 +127,10 @@ def song():
                 return "Unknown listening_to video key (expected 'youtube_video_id')", 400
 
         elif request.method == "DELETE":
+            auth_response = _checkRequestAuth(request.json)
+            if auth_response is not None:
+                return auth_response
+
             _setStatus("listening_to", {})
             
         else:
