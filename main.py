@@ -12,6 +12,7 @@ STATUS_LIFETIMES_S: dict[str, int] = {
 }
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:105.0) Gecko/20100101 Firefox/105.0"
 SUPABASE_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+EXTRA_STATUS_KEYS = ("client_name", "client_url", "client_icon")
 
 TOASTBITS_AUTH_TOKEN: str = os.environ.get("TOASTBITS_AUTH_TOKEN")
 SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
@@ -96,6 +97,10 @@ def _getListeningTo():
 
     if "youtube_video_id" in data["value"]:
         data["youtube_video_id"] = data["value"]["youtube_video_id"]
+        
+        for key in EXTRA_STATUS_KEYS:
+            if key in data["value"]:
+                data[key] = data["value"][key]
     else:
         return None
 
@@ -122,7 +127,12 @@ def song():
             if len(data) == 0:
                 _setStatus("listening_to", {})
             elif "youtube_video_id" in data:
-                _setStatus("listening_to", {"youtube_video_id": data["youtube_video_id"]})
+                status = {"youtube_video_id": data["youtube_video_id"]}
+                for key in EXTRA_STATUS_KEYS:
+                    if key in data:
+                        status[key] = data[key]
+
+                _setStatus("listening_to", status)
             else:
                 return "Unknown listening_to video key (expected 'youtube_video_id')", 400
 
