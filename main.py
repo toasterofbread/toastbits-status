@@ -94,7 +94,7 @@ def _checkRequestAuth(request_data):
 def _getListeningTo():
     data = _getStatusIfInLifetime("listening_to")
 
-    if data is None:
+    if data is None or data["value"] is None:
         return None
 
     if "youtube_video_id" in data["value"]:
