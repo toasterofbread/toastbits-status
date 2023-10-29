@@ -2,6 +2,7 @@ import os
 import traceback
 from waitress import serve
 from flask import Flask, Response, request
+from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime, timezone
 import json
@@ -24,6 +25,7 @@ assert(SUPABASE_KEY is not None)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
+CORS(app)
 
 def _getNow():
     return datetime.utcnow()
